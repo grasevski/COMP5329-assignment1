@@ -9,6 +9,7 @@ Dependencies:
  * yapf, pycodestyle (for linting): `pip install yapf pycodestyle`
 
 Usage:
+
     # run code
     ./assignment1.py
     
