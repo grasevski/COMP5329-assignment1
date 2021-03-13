@@ -106,7 +106,7 @@ class HiddenLayer(object):
 
     def backward(self, delta, output_layer=False):
         self.grad_W = np.atleast_2d(self.input).T.dot(np.atleast_2d(delta))
-        self.grad_b = delta
+        self.grad_b = np.sum(delta, axis=0)
         if self.activation_deriv:
             delta = delta.dot(self.W.T) * self.activation_deriv(self.input)
         return delta
@@ -150,9 +150,7 @@ class MLP:
         activation_deriv = Activation(self.activation[-1]).f_deriv
         # MSE
         error = y - y_hat
-        # XXX the below line only handled scalars
-        # loss=error**2
-        loss = error.T @ error
+        loss = np.average(np.average(error ** 2, axis=0))
         # calculate the delta of the output layer
         delta = -error * activation_deriv(y_hat)
         # return loss and delta
@@ -173,7 +171,7 @@ class MLP:
 
     # define the training function
     # it will return all losses within the whole training process.
-    def fit(self, X, y, learning_rate=0.1, epochs=100):
+    def fit(self, X, y, learning_rate=0.1, epochs=100, batch=1024):
         """
         Online learning.
         :param X: Input data or features
@@ -181,25 +179,15 @@ class MLP:
         :param learning_rate: parameters defining the speed of learning
         :param epochs: number of iterations over the training data
         """
-        X = np.array(X)
-        y = np.array(y)
-        to_return = np.zeros(epochs)
-
+        data, to_return = np.hstack((X, y)), np.zeros(epochs)
         for k in range(epochs):
-            loss = np.zeros(X.shape[0])
-            for it in range(X.shape[0]):
-                i = np.random.randint(X.shape[0])
-
-                # forward pass
-                y_hat = self.forward(X[i])
-
-                # backward pass
-                loss[it], delta = self.criterion_MSE(y[i], y_hat)
+            np.random.shuffle(data)
+            for b in np.array_split(data, len(data) // batch):
+                y_hat = self.forward(b[:, :-y.shape[1]])
+                loss, delta = self.criterion_MSE(b[:, -y.shape[1]:], y_hat)
                 self.backward(delta)
-                y
-                # update
                 self.update(learning_rate)
-            to_return[k] = np.mean(loss)
+                to_return[k] += len(b) * loss / len(data)
         return to_return
 
     # define the prediction function
@@ -207,8 +195,6 @@ class MLP:
     # data, by using the well-trained network.
     def predict(self, x):
         x = np.array(x)
-        # XXX the below line only handled scalars
-        # output = np.zeros(x.shape[0])
         output = np.zeros((x.shape[0], len(self.layers[-1].b)))
         for i in np.arange(x.shape[0]):
             output[i] = nn.forward(x[i, :])
@@ -226,8 +212,8 @@ y, y_test = lb.transform(y), lb.transform(y_test)
 nn = MLP([X.shape[1], y.shape[1]], [None, 'logistic'])
 
 # Try different learning rate and epochs
-MSE = nn.fit(X, y, learning_rate=0.001, epochs=5)
-print('loss:%f' % MSE[-1])
+loss = nn.fit(X, y)
+print('loss:%f' % loss[-1])
 
 y_pred = nn.predict(X_test)
 
