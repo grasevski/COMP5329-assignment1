@@ -223,7 +223,7 @@ lb = LabelBinarizer().fit(y)
 y, y_test = lb.transform(y), lb.transform(y_test)
 
 # Try different MLP models
-nn = MLP([X.shape[1], 3, y.shape[1]], [None, 'logistic', 'tanh'])
+nn = MLP([X.shape[1], y.shape[1]], [None, 'logistic'])
 
 # Try different learning rate and epochs
 MSE = nn.fit(X, y, learning_rate=0.001, epochs=5)
