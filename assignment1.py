@@ -207,7 +207,8 @@ class MLP:
     # data, by using the well-trained network.
     def predict(self, x):
         x = np.array(x)
-        # XXX change output to be 2d, for multiclass
+        # XXX the below line only handled scalars
+        # output = np.zeros(x.shape[0])
         output = np.zeros((x.shape[0], len(self.layers[-1].b)))
         for i in np.arange(x.shape[0]):
             output[i] = nn.forward(x[i, :])
