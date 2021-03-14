@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Neural networks from scratch."""
 import numpy as np
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import log_loss
-from sklearn.preprocessing import LabelBinarizer
+from sklearn.preprocessing import label_binarize
 
 
 # create a activation class
@@ -33,6 +34,9 @@ class Activation(object):
         elif activation == 'tanh':
             self.f = self.__tanh
             self.f_deriv = self.__tanh_deriv
+        elif activation == 'relu':
+            self.f = lambda x: x if x > 0 else 0
+            self.f_deriv = lambda a: int(a > 0)
 
 
 # now we define the hidden layer for the mlp
@@ -123,7 +127,7 @@ class MLP:
         :param layers: A list containing the number of units in each layer.
         Should be at least two values
         :param activation: The activation function to be used. Can be
-        "logistic" or "tanh"
+        "logistic", "tanh" or "relu"
         """
         # initialize layers
         self.layers = []
@@ -148,12 +152,16 @@ class MLP:
     # you can try other loss, such as cross entropy.
     def criterion_MSE(self, y, y_hat):
         activation_deriv = Activation(self.activation[-1]).f_deriv
-        # MSE
         error = y - y_hat
         loss = np.average(np.average(error ** 2, axis=0))
-        # calculate the delta of the output layer
         delta = -error * activation_deriv(y_hat)
-        # return loss and delta
+        return loss, delta
+
+    def criterion_crossentropy(self, y, y_hat):
+        activation_deriv = Activation(self.activation[-1]).f_deriv
+        error = y - y_hat
+        loss = log_loss(y, y_hat)
+        delta = -error * activation_deriv(y_hat)
         return loss, delta
 
     # backward progress
@@ -178,13 +186,14 @@ class MLP:
         :param y: Input targets
         :param learning_rate: parameters defining the speed of learning
         :param epochs: number of iterations over the training data
+        :param batch: mini batch size
         """
         data, to_return = np.hstack((X, y)), np.zeros(epochs)
         for k in range(epochs):
             np.random.shuffle(data)
             for b in np.array_split(data, len(data) // batch):
                 y_hat = self.forward(b[:, :-y.shape[1]])
-                loss, delta = self.criterion_MSE(b[:, -y.shape[1]:], y_hat)
+                loss, delta = self.criterion_crossentropy(b[:, -y.shape[1]:], y_hat)
                 self.backward(delta)
                 self.update(learning_rate)
                 to_return[k] += len(b) * loss / len(data)
@@ -205,16 +214,20 @@ class MLP:
     np.load(f'data/{k}.npy')
     for k in ('train_data', 'train_label', 'test_data', 'test_label')
 ]
-lb = LabelBinarizer().fit(y)
-y, y_test = lb.transform(y), lb.transform(y_test)
 
-# Try different MLP models
+lr = LogisticRegression(multi_class='ovr').fit(X, y.ravel())
+y = label_binarize(y, classes=lr.classes_)
+y_test = label_binarize(y_test, classes=lr.classes_)
+y_pred = lr.predict_proba(X)
+loss = log_loss(y, y_pred)
+print(f'baseline train: {loss}')
+y_pred = lr.predict_proba(X_test)
+loss = log_loss(y_test, y_pred)
+print(f'baseline: {loss}')
+
 nn = MLP([X.shape[1], y.shape[1]], [None, 'logistic'])
-
-# Try different learning rate and epochs
-loss = nn.fit(X, y)
-print('loss:%f' % loss[-1])
-
+loss = nn.fit(X, y, learning_rate=0.001)
+print(f'nn train: {loss[-1]}')
 y_pred = nn.predict(X_test)
-
-print(log_loss(y_test, y_pred))
+loss = log_loss(y_test, y_pred)
+print(f'nn: {loss}')
