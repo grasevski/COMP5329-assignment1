@@ -206,7 +206,7 @@ class MLP:
         x = np.array(x)
         output = np.zeros((x.shape[0], len(self.layers[-1].b)))
         for i in np.arange(x.shape[0]):
-            output[i] = nn.forward(x[i, :])
+            output[i] = self.forward(x[i, :])
         return output
 
 
