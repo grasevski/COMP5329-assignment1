@@ -1,13 +1,26 @@
 #!/usr/bin/env python3
 """Deep learning from scratch."""
 import numpy as np
-from scipy.special import softmax
-from sklearn.metrics import log_loss
-from sklearn.preprocessing import label_binarize
 from typing import List
 
 
-class Layer:
+def label_binarize(y: np.ndarray, classes: List[int]) -> np.ndarray:
+    """Convert the array of labels to an array of one hot vectors."""
+    return np.hstack([y == c for c in classes])
+
+
+def softmax(X: np.ndarray, axis=None) -> np.ndarray:
+    """Normalize a vector of weights to probabilities."""
+    e = np.exp(X)
+    return e / e.sum(axis=axis)[np.newaxis].T
+
+
+def log_loss(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """Multiclass cross entropy cost."""
+    return -(y_true * np.log(y_pred)).sum(axis=1).mean()
+
+
+class Dense:
     """A fully connected layer."""
     def __init__(self,
                  n_in: int,
@@ -31,18 +44,51 @@ class Layer:
         return ret
 
     def backward(self, delta: np.ndarray) -> np.ndarray:
-        """Update the gradients."""
+        """Calculate gradient for linear, activation and dropout."""
         self.grad_W = self._X.T @ delta
-        self.grad_b = np.sum(delta, axis=0)
+        self.grad_b = delta.sum(axis=0)
         if self._activation == 'relu':
             delta[delta < 0] = 0
         delta *= self._D
         return delta @ self.W.T
 
 
+class BatchNorm:
+    """Batch normalization layer."""
+    def __init__(self, n: int, momentum: float, epsilon: float):
+        self.W = np.zeros(n)
+        self.b = np.zeros(n)
+        self._momentum = momentum
+        self._epsilon = epsilon
+        self._running_mean = np.zeros(n)
+        self._running_var = np.zeros(n)
+
+    def __call__(self, X: np.ndarray, train: bool) -> np.ndarray:
+        mean = self._running_mean
+        var = self._running_var
+        if train:
+            mean = np.mean(X, axis=0)
+            var = np.var(X, axis=0)
+            self._running_mean *= self._momentum
+            self._running_mean += (1 - self._momentum) * mean
+            self._running_var *= self._momentum
+            self._running_var += (1 - self._momentum) * var
+        self._std_inv = 1 / np.sqrt(var + self._epsilon)
+        self._X = (X - mean) * self._std_inv
+        return self.W * self._X + self.b
+
+    def backward(self, delta: np.ndarray) -> np.ndarray:
+        """Calculate gradient for batch normalization."""
+        self.grad_W = (delta * self._X).sum(axis=0)
+        self.grad_b = delta.sum(axis=0)
+        dx = delta * self.W
+        return self._std_inv * (dx - dx.mean(axis=0) - self._X *
+                                (dx * self._X).mean(axis=0))
+
+
 class Classifier:
     """Multiclass classifier implemented as a multi layer perceptron."""
-    def __init__(self, layers: List[Layer]):
+    def __init__(self, layers: list):
         self.layers = layers
 
     def fit(self,
@@ -95,8 +141,10 @@ classes = list(range(10))
 y = label_binarize(y, classes=classes)
 y_test = label_binarize(y_test, classes=classes)
 model = Classifier([
-    Layer(X.shape[1], 181, activation='relu', dropout=0.1),
-    Layer(181, y.shape[1]),
+    #BatchNorm(X.shape[1], 0.9, 0.001),
+    Dense(X.shape[1], 181, activation='relu', dropout=0.1),
+    #BatchNorm(181, 0.99, 1e-9),
+    Dense(181, y.shape[1]),
 ])
 model.fit(X, y, 1000, 100, 1e-5, momentum=0.9, weight_decay=0.1)
 y_pred = model.predict_proba(X)
