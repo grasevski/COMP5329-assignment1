@@ -9,7 +9,7 @@ def label_binarize(y: np.ndarray, classes: List[int]) -> np.ndarray:
     return np.hstack([y == c for c in classes])
 
 
-def softmax(X: np.ndarray, axis=None) -> np.ndarray:
+def softmax(X: np.ndarray, axis: int) -> np.ndarray:
     """Normalize a vector of weights to probabilities."""
     e = np.exp(X)
     return e / e.sum(axis=axis)[np.newaxis].T
