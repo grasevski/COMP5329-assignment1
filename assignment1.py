@@ -56,7 +56,7 @@ class Dense:
 class BatchNorm:
     """Batch normalization layer."""
     def __init__(self, n: int, momentum: float, epsilon: float):
-        self.W = np.zeros(n)
+        self.W = np.ones(n)
         self.b = np.zeros(n)
         self._momentum = momentum
         self._epsilon = epsilon
