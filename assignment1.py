@@ -61,7 +61,7 @@ class BatchNorm:
         self._momentum = momentum
         self._epsilon = epsilon
         self._running_mean = np.zeros(n)
-        self._running_var = np.zeros(n)
+        self._running_var = np.ones(n)
 
     def __call__(self, X: np.ndarray, train: bool) -> np.ndarray:
         mean = self._running_mean
@@ -141,12 +141,13 @@ classes = list(range(10))
 y = label_binarize(y, classes=classes)
 y_test = label_binarize(y_test, classes=classes)
 model = Classifier([
-    #BatchNorm(X.shape[1], 0.9, 0.001),
-    Dense(X.shape[1], 181, activation='relu', dropout=0.1),
-    #BatchNorm(181, 0.99, 1e-9),
-    Dense(181, y.shape[1]),
+    Dense(X.shape[1], 1024, activation='relu', dropout=0.5),
+    BatchNorm(1024, 0.99, 0.001),
+    Dense(1024, 512, activation='relu', dropout=0.5),
+    BatchNorm(512, 0.99, 0.001),
+    Dense(512, y.shape[1]),
 ])
-model.fit(X, y, 1000, 100, 1e-5, momentum=0.9, weight_decay=0.1)
+model.fit(X, y, 1000, 100, 1e-5, momentum=0.9, weight_decay=0.01)
 y_pred = model.predict_proba(X)
 loss = log_loss(y, y_pred)
 print(f'train: {loss}')
