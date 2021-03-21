@@ -27,6 +27,7 @@ class Dense:
                  n_out: int,
                  activation: str = '',
                  dropout: float = 0):
+        """Randomly initialize weights."""
         bound = np.sqrt(6 / (n_in + n_out))
         self.W = np.random.uniform(low=-bound, high=bound, size=(n_in, n_out))
         self.b = np.zeros(n_out)
@@ -34,6 +35,7 @@ class Dense:
         self._dropout = dropout
 
     def __call__(self, X: np.ndarray, train: bool) -> np.ndarray:
+        """Apply hidden layer and any additional transformations."""
         self._X = X
         ret = X @ self.W + self.b
         if self._activation == 'relu':
@@ -56,6 +58,7 @@ class Dense:
 class BatchNorm:
     """Batch normalization layer."""
     def __init__(self, n: int, momentum: float, epsilon: float):
+        """Initialize weights."""
         self.W = np.ones(n)
         self.b = np.zeros(n)
         self._momentum = momentum
@@ -64,6 +67,7 @@ class BatchNorm:
         self._running_var = np.ones(n)
 
     def __call__(self, X: np.ndarray, train: bool) -> np.ndarray:
+        """Center and scale input data."""
         mean = self._running_mean
         var = self._running_var
         if train:
@@ -89,6 +93,7 @@ class BatchNorm:
 class Classifier:
     """Multiclass classifier implemented as a multi layer perceptron."""
     def __init__(self, layers: list):
+        """Construct neural network."""
         self.layers = layers
 
     def fit(self,
