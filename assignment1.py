@@ -39,9 +39,10 @@ class Dense:
         ret = X @ self.W + self.b
         if self._activation == 'relu':
             ret[ret < 0] = 0
-        self._D = (np.random.rand(*ret.shape) >=
-                   self._dropout) / (1 - self._dropout)
-        ret *= self._D
+        if train:
+            self._D = (np.random.rand(*ret.shape) >=
+                       self._dropout) / (1 - self._dropout)
+            ret *= self._D
         return ret
 
     def backward(self, delta: np.ndarray) -> np.ndarray:
