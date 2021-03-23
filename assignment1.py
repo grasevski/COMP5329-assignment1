@@ -47,7 +47,8 @@ class Dense:
 
     def backward(self, delta: np.ndarray) -> np.ndarray:
         """Calculate gradient for linear, activation and dropout."""
-        self.grad_W, self.grad_b = self._X.T @ delta, delta.sum(axis=0)
+        self.grad_W = self._X.T @ delta
+        self.grad_b = delta.sum(axis=0)
         if self._activation == 'relu':
             delta[delta < 0] = 0
         delta *= self._D
@@ -77,8 +78,8 @@ class BatchNorm:
 
     def backward(self, delta: np.ndarray) -> np.ndarray:
         """Calculate gradient for batch normalization."""
-        self.grad_W, self.grad_b = (delta *
-                                    self._X).sum(axis=0), delta.sum(axis=0)
+        self.grad_W = (delta * self._X).sum(axis=0)
+        self.grad_b = delta.sum(axis=0)
         dx = delta * self.W
         return self._std_inv * (dx - dx.mean(axis=0) - self._X *
                                 (dx * self._X).mean(axis=0))
