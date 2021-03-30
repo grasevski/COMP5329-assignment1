@@ -28,12 +28,13 @@ class Dense:
                  n_in: int,
                  n_out: int,
                  activation: str = '',
+                 l2: float = 0,
                  dropout: float = 0):
         """Randomly initialize weights."""
         bound = np.sqrt(6 / (n_in + n_out))
         self.W = np.random.uniform(low=-bound, high=bound, size=(n_in, n_out))
         self.b = np.zeros(n_out)
-        self._activation, self._dropout = activation, dropout
+        self._activation, self._l2, self._dropout = activation, l2, dropout
 
     def __call__(self, X: np.ndarray, train: bool) -> np.ndarray:
         """Apply hidden layer and any additional transformations."""
@@ -41,6 +42,7 @@ class Dense:
         ret = X @ self.W + self.b
         if self._activation == 'relu':
             ret[ret < 0] = 0
+            self._next_X = ret
         if train:
             self._D = (np.random.rand(*ret.shape) >=
                        self._dropout) / (1 - self._dropout)
@@ -49,12 +51,12 @@ class Dense:
 
     def backward(self, delta: np.ndarray) -> np.ndarray:
         """Calculate gradient for linear, activation and dropout."""
-        self.grad_W, self.grad_b = self._X.T @ delta, delta.sum(axis=0)
         delta *= self._D
-        delta = delta @ self.W.T
-        if self._activation == 'relu' or True:
-            delta *= self._X > 0
-        return delta
+        if self._activation == 'relu':
+            delta *= self._next_X > 0
+        self.grad_W = self._X.T @ delta + self._l2 * self.W
+        self.grad_b = delta.sum(axis=0)
+        return delta @ self.W.T
 
 
 class BatchNorm:
@@ -99,8 +101,7 @@ class Classifier:
             batch_size: int,
             epochs: int,
             lr: float,
-            momentum: float = 0,
-            weight_decay: float = 0) -> None:
+            momentum: float = 0) -> None:
         """Train the network with early stopping on training loss."""
         v_W = [np.zeros_like(layer.W) for layer in self._layers]
         v_b = [np.zeros_like(layer.b) for layer in self._layers]
@@ -115,11 +116,11 @@ class Classifier:
                 for i, layer in reversed(list(enumerate(self._layers))):
                     delta = layer.backward(delta)
                     v_W[i] *= momentum
-                    v_W[i] -= lr * (layer.grad_W + weight_decay * layer.W)
+                    v_W[i] += lr * layer.grad_W
                     v_b[i] *= momentum
-                    v_b[i] -= lr * (layer.grad_b + weight_decay * layer.b)
-                    layer.W += v_W[i]
-                    layer.b += v_b[i]
+                    v_b[i] += lr * layer.grad_b
+                    layer.W -= v_W[i]
+                    layer.b -= v_b[i]
                 loss += len(batch) * cost / len(data)
             print(f'epoch {epoch + 1}/{epochs} log loss: {loss}')
             if loss > best or np.isnan(loss):
@@ -147,13 +148,13 @@ def objective(trial) -> float:
     n2 = trial.suggest_int('n2', y.shape[1], X.shape[1], log=True)
     model = Classifier([
         BatchNorm(X.shape[1], trial.suggest_uniform('m1', 0, 1), trial.suggest_loguniform('e1', 1e-9, 1)),
-        Dense(X.shape[1], n1, activation='relu', dropout=trial.suggest_loguniform('d1', 1e-9, 1)),
+        Dense(X.shape[1], n1, activation='relu', dropout=trial.suggest_loguniform('d1', 1e-9, 1), l2=trial.suggest_loguniform('l2_1', 1e-9, 1)),
         BatchNorm(n1, trial.suggest_uniform('m2', 0, 1), trial.suggest_loguniform('e2', 1e-9, 1)),
-        Dense(n1, n2, activation='relu', dropout=trial.suggest_loguniform('d2', 1e-9, 1)),
+        Dense(n1, n2, activation='relu', dropout=trial.suggest_loguniform('d2', 1e-9, 1), l2=trial.suggest_loguniform('l2_1', 1e-9, 1)),
         BatchNorm(n2, trial.suggest_uniform('m3', 0, 1), trial.suggest_loguniform('e3', 1e-9, 1)),
-        Dense(n2, y.shape[1]),
+        Dense(n2, y.shape[1], dropout=trial.suggest_loguniform('d3', 1e-9, 1), l2=trial.suggest_loguniform('l2_1', 1e-9, 1)),
     ])
-    model.fit(X, y, trial.suggest_int('b', 1, len(X), log=True), 1000, trial.suggest_loguniform('lr', 1e-9, 1e-4), momentum=trial.suggest_uniform('momentum', 0, 1), weight_decay=trial.suggest_loguniform('weight_decay', 1e-9, 1))
+    model.fit(X, y, trial.suggest_int('b', 1, len(X), log=True), 1000, trial.suggest_loguniform('lr', 1e-9, 1e-4), momentum=trial.suggest_uniform('momentum', 0, 1))
     return log_loss(y_test, model.predict_proba(X_test))
 
 
@@ -174,19 +175,19 @@ def make(params: dict) -> list:
 #{"n1": 66, "n2": 60, "m1": 0.9118555721913466, "e1": 2.4314972323867697e-06, "d1": 2.3876714806756635e-05, "m2": 0.044173149016412144, "e2": 0.9405022889233455, "d2": 4.989790137474286e-09, "m3": 0.49352730366205383, "e3": 0.5526208592051385, "lr": 2.8852447317380467e-05, "momentum": 0.45814875359108037, "weight_decay": 1.3468924099172088e-09}
 
 
-#study = optuna.create_study()
-#study.optimize(objective, n_trials=10000)
-#trial = study.best_trial
-#print(json.dumps({'value': trial.value, 'params': trial.params}))
+study = optuna.create_study()
+study.optimize(objective, n_trials=1000)
+trial = study.best_trial
+print(json.dumps({'value': trial.value, 'params': trial.params}))
 
-model = Classifier([
-    #Dense(X.shape[1], 1024, activation='relu', dropout=0.5),
-    #BatchNorm(1024, 0.99, 0.001),
-    #Dense(1024, 512, activation='relu', dropout=0.5),
-    #BatchNorm(512, 0.99, 0.001),
-    Dense(X.shape[1], y.shape[1], activation='relu'),
-    Dense(y.shape[1], y.shape[1]),
-])
-model.fit(X, y, 100, 1000, 1e-5, momentum=0.9)
-print(f'train log loss: {log_loss(y, model.predict_proba(X))}')
-print(f'test log loss: {log_loss(y_test, model.predict_proba(X_test))}')
+#model = Classifier([
+#    BatchNorm(X.shape[1], 0.99, 0.001),
+#    Dense(X.shape[1], 1024, activation='relu', dropout=0.5, l2=0.1),
+#    BatchNorm(1024, 0.99, 0.001),
+#    Dense(1024, 512, activation='relu', dropout=0.5, l2=0.1),
+#    BatchNorm(512, 0.99, 0.001),
+#    Dense(512, y.shape[1], dropout=0.5, l2=0.1),
+#])
+#model.fit(X, y, 1000, 100, 1e-5, momentum=0.9)
+#print(f'train log loss: {log_loss(y, model.predict_proba(X))}')
+#print(f'test log loss: {log_loss(y_test, model.predict_proba(X_test))}')
