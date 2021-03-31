@@ -3,10 +3,9 @@
 import json
 import numpy as np
 import optuna
-from typing import List
 
 
-def label_binarize(y: np.ndarray, classes: List[int]) -> np.ndarray:
+def label_binarize(y: np.ndarray, classes: list) -> np.ndarray:
     """Convert the array of labels to an array of one hot vectors."""
     return np.hstack([y == c for c in classes])
 
@@ -54,8 +53,8 @@ class Dense:
         delta *= self._D
         if self._activation == 'relu':
             delta *= self._next_X > 0
-        self.grad_W = self._X.T @ delta + self._l2 * self.W
-        self.grad_b = delta.sum(axis=0)
+        self.grad_W = (self._X.T @ delta) / len(delta) + self._l2 * self.W
+        self.grad_b = delta.mean(axis=0)
         return delta @ self.W.T
 
 
@@ -82,8 +81,8 @@ class BatchNorm:
 
     def backward(self, delta: np.ndarray) -> np.ndarray:
         """Calculate gradient for batch normalization."""
-        self.grad_W = (delta * self._X).sum(axis=0)
-        self.grad_b = delta.sum(axis=0)
+        self.grad_W = (delta * self._X).mean(axis=0)
+        self.grad_b = delta.mean(axis=0)
         dx = delta * self.W
         return self._std_inv * (dx - dx.mean(axis=0) - self._X *
                                 (dx * self._X).mean(axis=0))
@@ -150,11 +149,11 @@ def objective(trial) -> float:
         BatchNorm(X.shape[1], trial.suggest_uniform('m1', 0, 1), trial.suggest_loguniform('e1', 1e-9, 1)),
         Dense(X.shape[1], n1, activation='relu', dropout=trial.suggest_loguniform('d1', 1e-9, 1), l2=trial.suggest_loguniform('l2_1', 1e-9, 1)),
         BatchNorm(n1, trial.suggest_uniform('m2', 0, 1), trial.suggest_loguniform('e2', 1e-9, 1)),
-        Dense(n1, n2, activation='relu', dropout=trial.suggest_loguniform('d2', 1e-9, 1), l2=trial.suggest_loguniform('l2_1', 1e-9, 1)),
+        Dense(n1, n2, activation='relu', dropout=trial.suggest_loguniform('d2', 1e-9, 1), l2=trial.suggest_loguniform('l2_2', 1e-9, 1)),
         BatchNorm(n2, trial.suggest_uniform('m3', 0, 1), trial.suggest_loguniform('e3', 1e-9, 1)),
-        Dense(n2, y.shape[1], dropout=trial.suggest_loguniform('d3', 1e-9, 1), l2=trial.suggest_loguniform('l2_1', 1e-9, 1)),
+        Dense(n2, y.shape[1], dropout=trial.suggest_loguniform('d3', 1e-9, 1), l2=trial.suggest_loguniform('l2_3', 1e-9, 1)),
     ])
-    model.fit(X, y, trial.suggest_int('b', 1, len(X), log=True), 1000, trial.suggest_loguniform('lr', 1e-9, 1e-4), momentum=trial.suggest_uniform('momentum', 0, 1))
+    model.fit(X, y, trial.suggest_int('b', 1, len(X), log=True), 1000, trial.suggest_loguniform('lr', 1e-9, 1), momentum=trial.suggest_uniform('momentum', 0, 1))
     return log_loss(y_test, model.predict_proba(X_test))
 
 
@@ -173,21 +172,22 @@ def make(params: dict) -> list:
 
 #{"value": 2.0623634547747502, "params": {"n1": 126, "n2": 82, "m1": 0.31574289094103947, "e1": 4.633534155201676e-05, "d1": 0.00047475009162580007, "m2": 0.5800161698683498, "e2": 0.0001394505994988068, "d2": 0.00035707295916165716, "m3": 0.3087861681071012, "e3": 4.681352930833947e-08, "lr": 3.8083086753387537e-06, "momentum": 0.5466724735934154, "weight_decay": 5.430304659597914e-06}}
 #{"n1": 66, "n2": 60, "m1": 0.9118555721913466, "e1": 2.4314972323867697e-06, "d1": 2.3876714806756635e-05, "m2": 0.044173149016412144, "e2": 0.9405022889233455, "d2": 4.989790137474286e-09, "m3": 0.49352730366205383, "e3": 0.5526208592051385, "lr": 2.8852447317380467e-05, "momentum": 0.45814875359108037, "weight_decay": 1.3468924099172088e-09}
+#{"value": 1.2645908204879082, "params": {"n1": 127, "n2": 86, "m1": 0.8095528007161772, "e1": 0.03780149835855736, "d1": 0.2864310112516006, "l2_1": 4.763501988300191e-08, "m2": 0.9192392857388109, "e2": 5.109652719859108e-05, "d2": 0.013056343427947427, "m3": 0.7251056756596226, "e3": 6.4978724666414165e-06, "d3": 0.00031156076022059124, "b": 243, "lr": 5.2309151920092876e-05, "momentum": 0.9614464188677381}}
 
 
-study = optuna.create_study()
-study.optimize(objective, n_trials=1000)
-trial = study.best_trial
-print(json.dumps({'value': trial.value, 'params': trial.params}))
+#study = optuna.create_study()
+#study.optimize(objective, n_trials=1000)
+#trial = study.best_trial
+#print(json.dumps({'value': trial.value, 'params': trial.params}))
 
-#model = Classifier([
-#    BatchNorm(X.shape[1], 0.99, 0.001),
-#    Dense(X.shape[1], 1024, activation='relu', dropout=0.5, l2=0.1),
-#    BatchNorm(1024, 0.99, 0.001),
-#    Dense(1024, 512, activation='relu', dropout=0.5, l2=0.1),
-#    BatchNorm(512, 0.99, 0.001),
-#    Dense(512, y.shape[1], dropout=0.5, l2=0.1),
-#])
-#model.fit(X, y, 1000, 100, 1e-5, momentum=0.9)
-#print(f'train log loss: {log_loss(y, model.predict_proba(X))}')
-#print(f'test log loss: {log_loss(y_test, model.predict_proba(X_test))}')
+model = Classifier([
+    BatchNorm(X.shape[1], 0.99, 0.001),
+    Dense(X.shape[1], 1024, activation='relu', dropout=0.5, l2=0.01),
+    BatchNorm(1024, 0.99, 0.001),
+    Dense(1024, 512, activation='relu', dropout=0.5, l2=0.01),
+    BatchNorm(512, 0.99, 0.001),
+    Dense(512, y.shape[1], dropout=0.5, l2=0.01),
+])
+model.fit(X, y, 1000, 100, 1e-3, momentum=0.9)
+print(f'train log loss: {log_loss(y, model.predict_proba(X))}')
+print(f'test log loss: {log_loss(y_test, model.predict_proba(X_test))}')
