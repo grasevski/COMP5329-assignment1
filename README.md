@@ -2,7 +2,7 @@
 Deep learning from scratch
 
 Dependencies:
- * scipy (for running code): `pip install scikit-learn`
+ * numpy (for running code): `pip install numpy`
  * latex (for generating report)
  * make (for running Makefile)
  * bash (for building zip file)
@@ -12,9 +12,6 @@ Usage:
 
     # run code
     ./assignment1.py
-    
-    # usage info
-    ./assignment1.py -h
     
     # check code style
     make lint

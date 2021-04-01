@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Deep learning from scratch."""
+import csv
+import itertools
 import json
 import numpy as np
-import optuna
+import sys
 
 
 def label_binarize(y: np.ndarray, classes: list) -> np.ndarray:
@@ -105,6 +107,12 @@ class Classifier:
         v_W = [np.zeros_like(layer.W) for layer in self._layers]
         v_b = [np.zeros_like(layer.b) for layer in self._layers]
         data, best = np.hstack((X, y)), np.Inf
+        progress = {
+            'batch_size': batch_size,
+            'epochs': epochs,
+            'lr': lr,
+            'momentum': momentum
+        }
         for epoch in range(epochs):
             np.random.shuffle(data)
             loss = 0
@@ -121,7 +129,9 @@ class Classifier:
                     layer.W -= v_W[i]
                     layer.b -= v_b[i]
                 loss += len(batch) * cost / len(data)
-            print(f'epoch {epoch + 1}/{epochs} log loss: {loss}')
+            progress['epoch'] = epoch + 1
+            progress['logloss'] = loss
+            print(json.dumps(progress), file=sys.stderr)
             if loss > best or np.isnan(loss):
                 break
             best = loss
@@ -140,55 +150,33 @@ class Classifier:
 classes = list(range(10))
 y = label_binarize(y, classes=classes)
 y_test = label_binarize(y_test, classes=classes)
-
-
-def objective(trial) -> float:
-    n1 = trial.suggest_int('n1', y.shape[1], X.shape[1], log=True)
-    n2 = trial.suggest_int('n2', y.shape[1], X.shape[1], log=True)
-    model = Classifier([
-        BatchNorm(X.shape[1], trial.suggest_uniform('m1', 0, 1), trial.suggest_loguniform('e1', 1e-9, 1)),
-        Dense(X.shape[1], n1, activation='relu', dropout=trial.suggest_loguniform('d1', 1e-9, 1), l2=trial.suggest_loguniform('l2_1', 1e-9, 1)),
-        BatchNorm(n1, trial.suggest_uniform('m2', 0, 1), trial.suggest_loguniform('e2', 1e-9, 1)),
-        Dense(n1, n2, activation='relu', dropout=trial.suggest_loguniform('d2', 1e-9, 1), l2=trial.suggest_loguniform('l2_2', 1e-9, 1)),
-        BatchNorm(n2, trial.suggest_uniform('m3', 0, 1), trial.suggest_loguniform('e3', 1e-9, 1)),
-        Dense(n2, y.shape[1], dropout=trial.suggest_loguniform('d3', 1e-9, 1), l2=trial.suggest_loguniform('l2_3', 1e-9, 1)),
-    ])
-    model.fit(X, y, trial.suggest_int('b', 1, len(X), log=True), 1000, trial.suggest_loguniform('lr', 1e-9, 1), momentum=trial.suggest_uniform('momentum', 0, 1))
-    return log_loss(y_test, model.predict_proba(X_test))
-
-
-def make(params: dict) -> list:
-    return [
-        BatchNorm(X.shape[1], params['m1'], params['e1']),
-        Dense(X.shape[1], params['n1'], activation='relu', dropout=params['d1']),
-        BatchNorm(params['n1'], params['m2'], params['e2']),
-        Dense(params['n1'], params['n2'], activation='relu', dropout=params['d2']),
-        BatchNorm(params['n2'], params['m3'], params['e3']),
-        Dense(params['n2'], y.shape[1]),
-    ]
-
-
-
-
-#{"value": 2.0623634547747502, "params": {"n1": 126, "n2": 82, "m1": 0.31574289094103947, "e1": 4.633534155201676e-05, "d1": 0.00047475009162580007, "m2": 0.5800161698683498, "e2": 0.0001394505994988068, "d2": 0.00035707295916165716, "m3": 0.3087861681071012, "e3": 4.681352930833947e-08, "lr": 3.8083086753387537e-06, "momentum": 0.5466724735934154, "weight_decay": 5.430304659597914e-06}}
-#{"n1": 66, "n2": 60, "m1": 0.9118555721913466, "e1": 2.4314972323867697e-06, "d1": 2.3876714806756635e-05, "m2": 0.044173149016412144, "e2": 0.9405022889233455, "d2": 4.989790137474286e-09, "m3": 0.49352730366205383, "e3": 0.5526208592051385, "lr": 2.8852447317380467e-05, "momentum": 0.45814875359108037, "weight_decay": 1.3468924099172088e-09}
-#{"value": 1.2645908204879082, "params": {"n1": 127, "n2": 86, "m1": 0.8095528007161772, "e1": 0.03780149835855736, "d1": 0.2864310112516006, "l2_1": 4.763501988300191e-08, "m2": 0.9192392857388109, "e2": 5.109652719859108e-05, "d2": 0.013056343427947427, "m3": 0.7251056756596226, "e3": 6.4978724666414165e-06, "d3": 0.00031156076022059124, "b": 243, "lr": 5.2309151920092876e-05, "momentum": 0.9614464188677381}}
-#{"value": 1.2568822188982034, "params": {"n1": 118, "n2": 94, "m1": 0.7895599660203365, "e1": 3.8027245870000134e-05, "d1": 0.1682669822681163, "l2_1": 1.8860979359403354e-05, "m2": 0.014906538021598236, "e2": 1.199540760458743e-07, "d2": 0.17994789127319485, "l2_2": 5.523107895154889e-09, "m3": 0.2629527124702743, "e3": 0.00032349953516017566, "d3": 0.0011435840040768456, "l2_3": 4.5692155922859337e-07, "b": 834, "lr": 0.5771804407359811, "momentum": 0.6395258455958981}}
-
-
-#study = optuna.create_study()
-#study.optimize(objective, n_trials=1000)
-#trial = study.best_trial
-#print(json.dumps({'value': trial.value, 'params': trial.params}))
-
-model = Classifier([
-    BatchNorm(X.shape[1], 0.99, 0.001),
-    Dense(X.shape[1], 128, activation='relu', dropout=0.2),
-    BatchNorm(128, 0.99, 0.001),
-    Dense(128, 64, activation='relu', dropout=0.2),
-    BatchNorm(64, 0.99, 0.001),
-    Dense(64, y.shape[1]),
-])
-model.fit(X, y, 1000, 100, 0.1, momentum=0.9)
-print(f'train log loss: {log_loss(y, model.predict_proba(X))}')
-print(f'test log loss: {log_loss(y_test, model.predict_proba(X_test))}')
+combinations = itertools.product([0, 0.2], [0, 0.01], [0, 0.9])
+fields = [
+    'dropout', 'l2', 'momentum', 'train_logloss_mean', 'train_logloss_std',
+    'test_logloss_mean', 'test_logloss_std'
+]
+w = csv.DictWriter(sys.stdout, fieldnames=fields)
+w.writeheader()
+trials = 5
+train, test = np.zeros(trials), np.zeros(trials)
+for dropout, l2, momentum in combinations:
+    row = {'dropout': dropout, 'l2': l2, 'momentum': momentum}
+    for i in range(trials):
+        model = Classifier([
+            BatchNorm(X.shape[1], 0.99, 0.001),
+            Dense(X.shape[1], 128, activation='relu', dropout=dropout, l2=l2),
+            BatchNorm(128, 0.99, 0.001),
+            Dense(128, 64, activation='relu', dropout=dropout, l2=l2),
+            BatchNorm(64, 0.99, 0.001),
+            Dense(64, y.shape[1]),
+        ])
+        model.fit(X, y, 1000, 50, 0.1, momentum=momentum)
+        y_pred = model.predict_proba(X)
+        train[i] = log_loss(y, y_pred)
+        y_pred = model.predict_proba(X_test)
+        test[i] = log_loss(y_test, y_pred)
+    row['train_logloss_mean'] = train.mean()
+    row['train_logloss_std'] = train.std()
+    row['test_logloss_mean'] = test.mean()
+    row['test_logloss_std'] = test.std()
+    w.writerow(row)
