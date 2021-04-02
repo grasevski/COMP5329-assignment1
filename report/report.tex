@@ -4,6 +4,7 @@
 \usepackage{pgfplots}
 \usepackage{pgfplotstable}
 \pgfplotsset{compat = 1.17}
+\pgfplotstableread[col sep=comma]{../results.csv}\results
 \title{COMP5329 Assignment 1}
 \author{John Hu (zehu4485, 500395897) \and Nicholas Grasevski (ngra5777, 500710654)}
 \begin{document}
@@ -19,14 +20,18 @@
 \subsection{Preprocessing}
 \subsection{Modules}
 \subsubsection{Hidden layer}
-\subsubsection{ReLU}
+\subsubsection{Rectified Linear Unit (ReLU)}
 \subsubsection{Weight decay}
-\subsubsection{Momentum in SGD}
+\subsubsection{Momentum in Stochastic Gradient Descent (SGD)}
 \subsubsection{Dropout}
 \subsubsection{Softmax and cross entropy}
 \subsubsection{Mini batch training}
 \subsubsection{Batch normalization}
 \subsection{Design of best model}
+\begin{figure}
+\includegraphics[width=0.5\linewidth]{../model}
+\caption{Our best model architecture \label{fig:model}}
+\end{figure}
 
 \section{Experiments}
 \subsection{Performance}
@@ -36,6 +41,12 @@
 \subsubsection{Comparison methods}
 
 \section{Results}
+\begin{table}\pgfplotstabletypeset[
+    every head row/.style={after row=\hline},
+]{\results}\caption{
+  Train and test log loss mean and standard deviation on different hyperparameter settings.
+  \label{tab:results}
+}\end{table}
 
 \section{Discussion}
 

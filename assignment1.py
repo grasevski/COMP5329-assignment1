@@ -152,15 +152,14 @@ y = label_binarize(y, classes=classes)
 y_test = label_binarize(y_test, classes=classes)
 combinations = itertools.product([0, 0.2], [0, 0.01], [0, 0.9])
 fields = [
-    'dropout', 'l2', 'momentum', 'train_logloss_mean', 'train_logloss_std',
-    'test_logloss_mean', 'test_logloss_std'
+    'Dropout', 'L2', 'Momentum', 'Train', 'Train std', 'Test', 'Test std'
 ]
 w = csv.DictWriter(sys.stdout, fieldnames=fields)
 w.writeheader()
 trials = 5
 train, test = np.zeros(trials), np.zeros(trials)
 for dropout, l2, momentum in combinations:
-    row = {'dropout': dropout, 'l2': l2, 'momentum': momentum}
+    row = {'Dropout': dropout, 'L2': l2, 'Momentum': momentum}
     for i in range(trials):
         model = Classifier([
             BatchNorm(X.shape[1], 0.99, 0.001),
@@ -175,8 +174,8 @@ for dropout, l2, momentum in combinations:
         train[i] = log_loss(y, y_pred)
         y_pred = model.predict_proba(X_test)
         test[i] = log_loss(y_test, y_pred)
-    row['train_logloss_mean'] = train.mean()
-    row['train_logloss_std'] = train.std()
-    row['test_logloss_mean'] = test.mean()
-    row['test_logloss_std'] = test.std()
+    row['Train'] = train.mean()
+    row['Train std'] = train.std()
+    row['Test'] = test.mean()
+    row['Test std'] = test.std()
     w.writerow(row)
