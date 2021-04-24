@@ -146,7 +146,7 @@ class Classifier:
         """Train the network with early stopping on training loss."""
         v_W = [np.zeros_like(layer.W) for layer in self._layers]
         v_b = [np.zeros_like(layer.b) for layer in self._layers]
-        data, best = np.hstack((X, y)), np.Inf
+        data = np.hstack((X, y))
         progress = {
             'batch_size': batch_size,
             'epochs': epochs,
@@ -177,9 +177,6 @@ class Classifier:
                 for m in metrics:
                     progress[f'{t}_{m.__name__}'] = m(y_val, y_pred)
             print(json.dumps(progress), file=sys.stderr)
-            if loss > best or np.isnan(loss):
-                break
-            best = loss
 
     def predict_proba(self, X: np.ndarray, train: bool = False) -> np.ndarray:
         """Run the network and apply softmax to get probabilities."""
