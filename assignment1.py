@@ -204,6 +204,7 @@ fields = ['Dropout', 'L2', 'Momentum'] + [
 ]
 w = csv.DictWriter(sys.stdout, fieldnames=fields)
 w.writeheader()
+sys.stdout.flush()
 trials = 5
 train = np.zeros((trials, len(metrics)))
 test = np.zeros((trials, len(metrics)))
@@ -227,6 +228,7 @@ for dropout, l2, momentum in combinations:
     for t, a in ('Train', train), ('Test', test):
         mean, std = a.mean(axis=0), a.std(axis=0)
         for n, m, s in zip(metrics, mean, std):
-            row[f'{t} {m.__name__}'] = m
-            row[f'{t} {m.__name__} std'] = s
+            row[f'{t} {n.__name__}'] = m
+            row[f'{t} {n.__name__} std'] = s
     w.writerow(row)
+    sys.stdout.flush()
